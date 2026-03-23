@@ -25,12 +25,21 @@ postgresql.pkg-path = "postgresql"       # PostgreSQL client libs + psql CLI
 libyaml.pkg-path = "libyaml"             # Required by psych gem (YAML parsing)
 
 # Build toolchain (for compiling native gem extensions)
-gcc.pkg-path = "gcc"                     # C compiler for native extensions
+# On macOS, gcc from nixpkgs is a broken clang wrapper that can't find the SDK.
+# Use clang on darwin, gcc on linux.
+clang.pkg-path = "clang"                 # C compiler for macOS native extensions
+clang.systems = ["aarch64-darwin", "x86_64-darwin"]
+gcc.pkg-path = "gcc"                     # C compiler for Linux native extensions
+gcc.systems = ["aarch64-linux", "x86_64-linux"]
 gnumake.pkg-path = "gnumake"             # Make for native extension builds
 pkg-config.pkg-path = "pkg-config"       # Finds library paths for compilation
 
 # Developer utilities
 gum.pkg-path = "gum"                     # Styled terminal output
+
+# Docker/container runtime (macOS only)
+orbstack.pkg-path = "orbstack"           # Fast Docker & Linux VM runtime
+orbstack.systems = ["aarch64-darwin", "x86_64-darwin"]
 
 # Cross-platform compatibility
 coreutils.pkg-path = "coreutils"         # GNU coreutils (consistent across OS)
