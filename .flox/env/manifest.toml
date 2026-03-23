@@ -69,6 +69,21 @@ export GEM_PATH="$GEM_HOME/gems:${GEM_PATH:-}"
 export BOOTSNAP_CACHE_DIR="$FLOX_ENV_CACHE/bootsnap"
 export PATH="$FLOX_ENV_PROJECT/bin:$BUNDLE_BIN:$GEM_HOME/bin:$PATH"
 
+# Ensure pkg-config can find libyaml for psych gem compilation.
+# Flox installs the library but not the -dev split (headers + .pc file).
+if ! pkg-config --exists yaml-0.1 2>/dev/null; then
+    _libyaml_pc="$(find /nix/store -maxdepth 4 -name "yaml-0.1.pc" -path "*libyaml*" 2>/dev/null | head -1)"
+    if [ -n "$_libyaml_pc" ]; then
+        export PKG_CONFIG_PATH="$(dirname "$_libyaml_pc"):${PKG_CONFIG_PATH:-}"
+        # Also add the dev headers to CPATH
+        _libyaml_dev="$(dirname "$(dirname "$_libyaml_pc")")"
+        if [ -d "$_libyaml_dev/include" ]; then
+            export CPATH="$_libyaml_dev/include:${CPATH:-}"
+        fi
+    fi
+    unset _libyaml_pc _libyaml_dev
+fi
+
 # macOS SIP ignores DYLD_LIBRARY_PATH, so use LD_LIBRARY_PATH for FFI
 if [ "$(uname -s)" = "Darwin" ]; then
     export LD_LIBRARY_PATH="$FLOX_ENV/lib:${LD_LIBRARY_PATH:-}"
