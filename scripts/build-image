@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Build the production container image
+# This is the Flox-informed containerization step
+set -euo pipefail
+
+IMAGE_NAME="${IMAGE_NAME:-flox-rails-poc}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+
+echo "Building production image: ${IMAGE_NAME}:${IMAGE_TAG}"
+echo ""
+echo "Note: This Dockerfile mirrors the Flox-declared runtime."
+echo "See the Dockerfile header for the mapping."
+echo ""
+
+docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+
+echo ""
+echo "Built: ${IMAGE_NAME}:${IMAGE_TAG}"
+echo "Run:   docker run -p 3000:3000 -e DATABASE_HOST=host.docker.internal ${IMAGE_NAME}:${IMAGE_TAG}"

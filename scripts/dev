@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Start the Rails development server
+# Run from inside the Flox environment
+set -euo pipefail
+
+echo "Starting Rails development server..."
+echo "Health check: http://localhost:3000/health"
+echo "Items API:    http://localhost:3000/items"
+echo ""
+
+bundle exec rails server -b 0.0.0.0

@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: flox-poc-postgres
+    ports:
+      - "${PSQL_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: "${PSQL_USER:-postgres}"
+      POSTGRES_PASSWORD: "${PSQL_PASSWORD:-postgres}"
+      POSTGRES_DB: "flox_rails_poc_development"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:

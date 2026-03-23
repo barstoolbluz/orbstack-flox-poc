@@ -1,0 +1,60 @@
+# CI workflow — uses the Flox-defined runtime
+#
+# This workflow mirrors the local Flox development environment:
+# - Same Ruby version declared in the Flox manifest
+# - Same PostgreSQL version used in docker-compose.yml
+# - Flox installs all dependencies, ensuring CI matches local dev
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: flox_rails_poc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flox
+        uses: flox/install-flox-action@2
+
+      - name: Install dependencies via Flox
+        run: flox activate -- bundle install
+
+      - name: Setup database
+        run: flox activate -- bundle exec rails db:create db:migrate
+        env:
+          RAILS_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: "5432"
+          DATABASE_USER: postgres
+          DATABASE_PASSWORD: postgres
+
+      - name: Run tests
+        run: flox activate -- bundle exec rails test
+        env:
+          RAILS_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: "5432"
+          DATABASE_USER: postgres
+          DATABASE_PASSWORD: postgres

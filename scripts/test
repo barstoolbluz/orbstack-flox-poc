@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Run the test suite
+# Requires PostgreSQL to be running (scripts/db-up)
+set -euo pipefail
+
+export RAILS_ENV=test
+
+echo "Preparing test database..."
+bundle exec rails db:create db:migrate 2>/dev/null
+
+echo "Running tests..."
+bundle exec rails test "$@"

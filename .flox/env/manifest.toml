@@ -1,0 +1,135 @@
+schema-version = "1.10.0"
+
+# =============================================================================
+# Flox + OrbStack/Docker Proof of Concept
+# =============================================================================
+# This manifest declares the APPLICATION RUNTIME — everything the Rails app
+# needs to run, build gems, and support developer workflows.
+#
+# What this manifest does NOT manage:
+#   - PostgreSQL server (runs in Docker via docker-compose.yml)
+#   - Production container packaging (handled by Dockerfile)
+#
+# The declared packages here are the source of truth that informs both
+# CI (GitHub Actions installs Flox) and the production Dockerfile.
+# =============================================================================
+
+[install]
+# Language runtime
+ruby.pkg-path = "ruby"                   # Ruby 3.4.x — the app runtime
+
+# Database client (for pg gem compilation and CLI tools like psql)
+postgresql.pkg-path = "postgresql"       # PostgreSQL client libs + psql CLI
+
+# Native library dependencies (required for gem compilation)
+libyaml.pkg-path = "libyaml"             # Required by psych gem (YAML parsing)
+
+# Build toolchain (for compiling native gem extensions)
+gcc.pkg-path = "gcc"                     # C compiler for native extensions
+gnumake.pkg-path = "gnumake"             # Make for native extension builds
+pkg-config.pkg-path = "pkg-config"       # Finds library paths for compilation
+
+# Developer utilities
+gum.pkg-path = "gum"                     # Styled terminal output
+
+# Cross-platform compatibility
+coreutils.pkg-path = "coreutils"         # GNU coreutils (consistent across OS)
+gnused.pkg-path = "gnused"               # GNU sed (macOS ships BSD sed)
+
+
+[vars]
+# Invariant variables — these don't change between developers
+APP_NAME = "flox-rails-poc"
+
+
+[hook]
+on-activate = '''
+# Runtime-configurable variables (override with: VAR=value flox activate)
+export DATABASE_HOST="${DATABASE_HOST:-localhost}"
+export DATABASE_PORT="${DATABASE_PORT:-5432}"
+export DATABASE_USER="${DATABASE_USER:-postgres}"
+export DATABASE_PASSWORD="${DATABASE_PASSWORD:-postgres}"
+export RAILS_ENV="${RAILS_ENV:-development}"
+
+# Add gem bin directory to PATH (for rails, rake, etc.)
+RUBY_API_VERSION="$(ruby -e 'puts RbConfig::CONFIG["ruby_version"]')"
+export GEM_HOME="${GEM_HOME:-$HOME/.local/share/gem/ruby/$RUBY_API_VERSION}"
+export PATH="$GEM_HOME/bin:$PATH"
+
+# Ensure bundle install can find native libraries
+# (libyaml for psych, libpq for pg gem)
+setup_bundle_config() {
+    # Use pkg-config to verify yaml-0.1 is findable; if not, locate it
+    if ! pkg-config --exists yaml-0.1 2>/dev/null; then
+        local libyaml_pc
+        libyaml_pc="$(find "$FLOX_ENV/lib/pkgconfig" /nix/store/*/lib/pkgconfig \
+            -maxdepth 1 -name "yaml-0.1.pc" 2>/dev/null | head -1)"
+        if [ -n "$libyaml_pc" ]; then
+            export PKG_CONFIG_PATH="$(dirname "$libyaml_pc"):${PKG_CONFIG_PATH:-}"
+        fi
+    fi
+}
+
+setup_bundle_config
+
+# Install gems if Gemfile exists and bundle isn't up to date
+install_gems() {
+    if [ -f "$FLOX_ENV_PROJECT/Gemfile" ]; then
+        if ! bundle check > /dev/null 2>&1; then
+            gum style --foreground 214 "Installing gems..."
+            bundle install --quiet || {
+                gum style --foreground 196 "✗ Bundle install failed"
+                return 1
+            }
+        fi
+    fi
+}
+
+install_gems
+
+# Display environment info
+show_banner() {
+    gum style \
+        --foreground 212 --border-foreground 212 --border double \
+        --align center --width 56 --margin "1 0" --padding "1 2" \
+        "$APP_NAME" \
+        "" \
+        "Ruby $(ruby --version | cut -d' ' -f2)" \
+        "Rails app · PostgreSQL in Docker"
+
+    gum style --foreground 248 \
+        "  Database: $DATABASE_HOST:$DATABASE_PORT" \
+        "  Scripts:  scripts/{dev,db-up,db-down,db-reset,test}"
+}
+
+show_banner
+
+cd "$FLOX_ENV_PROJECT"
+'''
+
+
+[profile]
+common = '''
+# Aliases available in all shells
+alias be="bundle exec"
+alias rs="bundle exec rails server -b 0.0.0.0"
+alias rc="bundle exec rails console"
+alias dbup="$FLOX_ENV_PROJECT/scripts/db-up"
+alias dbdown="$FLOX_ENV_PROJECT/scripts/db-down"
+alias dbreset="$FLOX_ENV_PROJECT/scripts/db-reset"
+'''
+
+
+[services]
+# No Flox-managed services — PostgreSQL runs in Docker
+# This is intentional: stateful services belong in Docker where
+# volume management, health checks, and reset workflows are mature
+
+
+[options]
+systems = [
+  "aarch64-darwin",
+  "aarch64-linux",
+  "x86_64-darwin",
+  "x86_64-linux",
+]

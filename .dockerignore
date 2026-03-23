@@ -1,0 +1,16 @@
+.flox/
+.git/
+.github/
+.env
+.env.*
+!.env.example
+log/
+tmp/
+test/
+db/init/
+docker-compose.yml
+Dockerfile
+scripts/
+README.md
+DESIGN.md
+vendor/bundle/
