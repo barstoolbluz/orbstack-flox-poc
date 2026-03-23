@@ -119,6 +119,10 @@ cd "$FLOX_ENV_PROJECT"
 
 [profile]
 common = '''
+# Ensure Flox binaries and gem binaries take precedence over system paths
+# (macOS path_helper can reorder PATH, pushing /usr/bin ahead of $FLOX_ENV/bin)
+export PATH="$FLOX_ENV/bin:$GEM_HOME/bin:$PATH"
+
 # Aliases available in all shells
 alias be="bundle exec"
 alias rs="bundle exec rails server -b 0.0.0.0"
