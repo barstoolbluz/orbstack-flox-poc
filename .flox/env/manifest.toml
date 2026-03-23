@@ -60,76 +60,65 @@ export DATABASE_USER="${DATABASE_USER:-postgres}"
 export DATABASE_PASSWORD="${DATABASE_PASSWORD:-postgres}"
 export RAILS_ENV="${RAILS_ENV:-development}"
 
-# Add gem bin directory to PATH (for rails, rake, etc.)
-RUBY_API_VERSION="$(ruby -e 'puts RbConfig::CONFIG["ruby_version"]')"
-export GEM_HOME="${GEM_HOME:-$HOME/.local/share/gem/ruby/$RUBY_API_VERSION}"
-export PATH="$GEM_HOME/bin:$PATH"
+# Ruby/Bundler environment — store everything in Flox cache
+RUBY_LIB_VERSION="3.4.0"
+export BUNDLE_PATH="$FLOX_ENV_CACHE/bundler"
+export BUNDLE_BIN="$FLOX_ENV_CACHE/bundler/bin"
+export GEM_HOME="$FLOX_ENV_CACHE/bundler/ruby/$RUBY_LIB_VERSION"
+export GEM_PATH="$GEM_HOME/gems:${GEM_PATH:-}"
+export BOOTSNAP_CACHE_DIR="$FLOX_ENV_CACHE/bootsnap"
+export PATH="$FLOX_ENV_PROJECT/bin:$BUNDLE_BIN:$GEM_HOME/bin:$PATH"
 
-# Ensure bundle install can find native libraries
-# (libyaml for psych, libpq for pg gem)
-setup_bundle_config() {
-    # Use pkg-config to verify yaml-0.1 is findable; if not, locate it
-    if ! pkg-config --exists yaml-0.1 2>/dev/null; then
-        local libyaml_pc
-        libyaml_pc="$(find "$FLOX_ENV/lib/pkgconfig" /nix/store/*/lib/pkgconfig \
-            -maxdepth 1 -name "yaml-0.1.pc" 2>/dev/null | head -1)"
-        if [ -n "$libyaml_pc" ]; then
-            export PKG_CONFIG_PATH="$(dirname "$libyaml_pc"):${PKG_CONFIG_PATH:-}"
-        fi
-    fi
-}
-
-setup_bundle_config
-
-# Install gems if Gemfile exists and bundle isn't up to date
-install_gems() {
-    if [ -f "$FLOX_ENV_PROJECT/Gemfile" ]; then
-        if ! bundle check > /dev/null 2>&1; then
-            gum style --foreground 214 "Installing gems..."
-            bundle install --quiet || {
-                gum style --foreground 196 "✗ Bundle install failed"
-                return 1
-            }
-        fi
-    fi
-}
-
-install_gems
-
-# Display environment info
-show_banner() {
-    gum style \
-        --foreground 212 --border-foreground 212 --border double \
-        --align center --width 56 --margin "1 0" --padding "1 2" \
-        "$APP_NAME" \
-        "" \
-        "Ruby $(ruby --version | cut -d' ' -f2)" \
-        "Rails app · PostgreSQL in Docker"
-
-    gum style --foreground 248 \
-        "  Database: $DATABASE_HOST:$DATABASE_PORT" \
-        "  Scripts:  scripts/{dev,db-up,db-down,db-reset,test}"
-}
-
-show_banner
-
-cd "$FLOX_ENV_PROJECT"
+# macOS SIP ignores DYLD_LIBRARY_PATH, so use LD_LIBRARY_PATH for FFI
+if [ "$(uname -s)" = "Darwin" ]; then
+    export LD_LIBRARY_PATH="$FLOX_ENV/lib:${LD_LIBRARY_PATH:-}"
+fi
 '''
 
 
 [profile]
 common = '''
-# Ensure Flox binaries and gem binaries take precedence over system paths
-# (macOS path_helper can reorder PATH, pushing /usr/bin ahead of $FLOX_ENV/bin)
-export PATH="$FLOX_ENV/bin:$GEM_HOME/bin:$PATH"
-
-# Aliases available in all shells
+# Aliases
 alias be="bundle exec"
 alias rs="bundle exec rails server -b 0.0.0.0"
 alias rc="bundle exec rails console"
 alias dbup="$FLOX_ENV_PROJECT/scripts/db-up"
 alias dbdown="$FLOX_ENV_PROJECT/scripts/db-down"
 alias dbreset="$FLOX_ENV_PROJECT/scripts/db-reset"
+
+# Wrap bundle to auto-generate binstubs after install
+bundle() {
+    local run_binstubs=0
+
+    if (( $# == 0 )); then
+        run_binstubs=1
+    elif [[ "$1" == "install" ]]; then
+        run_binstubs=1
+    fi
+
+    command bundle "$@"
+    local rc=$?
+
+    if (( rc == 0 && run_binstubs == 1 )); then
+        command bundle binstubs --all
+    fi
+
+    return $rc
+}
+
+# Display environment info
+gum style \
+    --foreground 212 --border-foreground 212 --border double \
+    --align center --width 56 --margin "1 0" --padding "1 2" \
+    "$APP_NAME" \
+    "" \
+    "Ruby $(ruby --version | cut -d' ' -f2)" \
+    "Rails app · PostgreSQL in Docker"
+
+gum style --foreground 248 \
+    "  Database: $DATABASE_HOST:$DATABASE_PORT" \
+    "  Scripts:  scripts/{dev,db-up,db-down,db-reset,test}" \
+    "  Run:      bundle install  (first time setup)"
 '''
 
 
