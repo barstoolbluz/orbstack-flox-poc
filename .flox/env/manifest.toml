@@ -130,15 +130,12 @@ alias dbreset="$FLOX_ENV_PROJECT/scripts/db-reset"
 
 
 [services]
-# No Flox-managed services — PostgreSQL runs in Docker
-# This is intentional: stateful services belong in Docker where
-# volume management, health checks, and reset workflows are mature
+# OrbStack provides the Docker runtime on macOS
+orbstack.command = "orb start"
+orbstack.is-daemon = true
+orbstack.shutdown.command = "orb stop"
+orbstack.systems = ["aarch64-darwin", "x86_64-darwin"]
 
 
 [options]
-systems = [
-  "aarch64-darwin",
-  "aarch64-linux",
-  "x86_64-darwin",
-  "x86_64-linux",
-]
+systems = ["aarch64-darwin", "aarch64-linux", "x86_64-darwin", "x86_64-linux"]
